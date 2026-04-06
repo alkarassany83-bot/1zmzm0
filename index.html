@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام مركز زمزم الطبي | ERP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+    </div>
+
+    <div class="app-container glass">
+        
+        <header class="app-header border-bottom">
+            <div class="logo">
+                <i class="fa-solid fa-hospital-user"></i>
+                <h1>مركز زمزم الطبي</h1>
+            </div>
+            <div class="user-info">
+                <span id="currentDate"></span>
+            </div>
+        </header>
+
+        <main class="app-content">
+            
+            <section id="dashboard" class="page active">
+                <h2 class="page-title">نظرة عامة</h2>
+                <div class="cards-grid">
+                    <div class="glass-card stat-card">
+                        <i class="fa-solid fa-arrow-trend-up text-success"></i>
+                        <h3>إجمالي الواردات</h3>
+                        <p id="totalIncome" class="stat-value">0 د.ع</p>
+                    </div>
+                    <div class="glass-card stat-card">
+                        <i class="fa-solid fa-arrow-trend-down text-danger"></i>
+                        <h3>إجمالي المصروفات</h3>
+                        <p id="totalExpense" class="stat-value">0 د.ع</p>
+                    </div>
+                    <div class="glass-card stat-card">
+                        <i class="fa-solid fa-sack-dollar text-primary"></i>
+                        <h3>الصافي</h3>
+                        <p id="netProfit" class="stat-value">0 د.ع</p>
+                    </div>
+                </div>
+                <div class="glass-card chart-container mt-2">
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </section>
+
+            <section id="daily-entry" class="page">
+                <h2 class="page-title">الإدخال اليومي</h2>
+                <div class="glass-card form-container">
+                    <form id="dailyForm">
+                        <div class="input-group">
+                            <i class="fa-solid fa-calendar"></i>
+                            <input type="date" id="entryDate" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <select id="entryDepartment" required>
+                                <option value="" disabled selected>اختر القسم...</option>
+                                <option value="التجميل">التجميل</option>
+                                <option value="الاشعه">الاشعه</option>
+                                <option value="الطبيبه">الطبيبه</option>
+                                <option value="السونار">السونار</option>
+                                <option value="المختبر">المختبر</option>
+                                <option value="ضماد الرجال">ضماد الرجال</option>
+                                <option value="ضماد النساء">ضماد النساء</option>
+                                <option value="د ايلاف اسنان">د ايلاف اسنان</option>
+                                <option value="د حيان اسنان">د حيان اسنان</option>
+                                <option value="د غيث اسنان">د غيث اسنان</option>
+                                <option value="عدد زرعات">عدد زرعات</option>
+                                <option value="الطبيب">الطبيب</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <i class="fa-solid fa-money-bill-wave"></i>
+                            <input type="number" id="entryIncome" placeholder="الوارد (العمل)" required>
+                        </div>
+                        <div class="input-group hidden" id="subOptionGroup">
+                            <i class="fa-solid fa-list-check"></i>
+                            <select id="entrySubOption">
+                                </select>
+                        </div>
+                        <div class="input-group">
+                            <i class="fa-solid fa-file-invoice-dollar"></i>
+                            <input type="number" id="entryExpense" placeholder="المصروفات / القطوعات" required>
+                        </div>
+                        <button type="submit" class="btn-primary">حفظ السجل <i class="fa-solid fa-save"></i></button>
+                    </form>
+                </div>
+                
+                <h3 class="mt-2">سجلات اليوم</h3>
+                <div class="table-responsive glass-card mt-1">
+                    <table id="dailyTable">
+                        <thead>
+                            <tr>
+                                <th>القسم</th>
+                                <th>الخيار</th>
+                                <th>الوارد</th>
+                                <th>المصروف</th>
+                                <th>الصافي</th>
+                                <th>إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="finance" class="page">
+                <h2 class="page-title">الإدارة المالية</h2>
+                <div class="tabs glass-card">
+                    <button class="tab-btn active" onclick="switchSubTab('expenses')">المصروفات</button>
+                    <button class="tab-btn" onclick="switchSubTab('external-income')">الواردات الخارجية</button>
+                    <button class="tab-btn" onclick="switchSubTab('salaries')">الرواتب</button>
+                </div>
+                <div class="glass-card mt-1">
+                    <form id="financeForm">
+                        <input type="hidden" id="financeType" value="expenses">
+                        <div class="input-group">
+                            <i class="fa-solid fa-tag"></i>
+                            <input type="text" id="financeDetails" placeholder="التفاصيل (مثال: صيانة، فاتورة...)" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="fa-solid fa-coins"></i>
+                            <input type="number" id="financeAmount" placeholder="المبلغ" required>
+                        </div>
+                        <button type="submit" class="btn-primary">إضافة سجل</button>
+                    </form>
+                </div>
+            </section>
+
+            <section id="settings" class="page">
+                <h2 class="page-title">إعدادات النظام</h2>
+                <div class="glass-card settings-card">
+                    <div class="import-section text-center">
+                        <i class="fa-solid fa-file-excel fa-3x text-success mb-1"></i>
+                        <h3>استيراد قاعدة البيانات (Excel)</h3>
+                        <p>قم برفع ملف "مركز زمزم.xlsx" لتحليل البيانات واستيرادها للنظام.</p>
+                        
+                        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" hidden>
+                        <button class="btn-primary mt-1" onclick="document.getElementById('excelFile').click()">
+                            اختيار ملف Excel
+                        </button>
+                        <p id="fileNameDisplay" class="mt-1 small-text"></p>
+                        <button class="btn-success mt-1 hidden" id="processExcelBtn">
+                            معالجة واستيراد <i class="fa-solid fa-cogs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-card mt-2 border-danger">
+                    <h3 class="text-danger"><i class="fa-solid fa-triangle-exclamation"></i> منطقة الخطر</h3>
+                    <button class="btn-danger mt-1" onclick="app.clearData()">مسح جميع البيانات</button>
+                </div>
+            </section>
+
+        </main>
+
+        <nav class="bottom-nav border-top">
+            <a href="#" class="nav-item active" data-target="dashboard">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>الرئيسية</span>
+            </a>
+            <a href="#" class="nav-item" data-target="daily-entry">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>اليومية</span>
+            </a>
+            <a href="#" class="nav-item" data-target="finance">
+                <i class="fa-solid fa-wallet"></i>
+                <span>المالية</span>
+            </a>
+            <a href="#" class="nav-item" data-target="settings">
+                <i class="fa-solid fa-gear"></i>
+                <span>الإعدادات</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
