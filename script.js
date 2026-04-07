@@ -17,7 +17,8 @@ let appState = {
         dentist1Rate: 0.15, // 15% حسب الإكسل
         dentist2Rate: 0.10, // 10%
         cosmeticsRate: 0.20
-    }
+    },
+    purchases: [] // المشتريات
 };
 
 // Load data from LocalStorage
@@ -25,6 +26,9 @@ function loadData() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
         appState = JSON.parse(saved);
+        if (!appState.purchases) {
+            appState.purchases = [];
+        }
     }
 }
 
@@ -130,6 +134,7 @@ function initApp() {
     document.getElementById('entryDate').valueAsDate = new Date();
     updateDashboard();
     renderDailyTable();
+    renderPurchasesTable();
 }
 
 // Form Submission: Daily Entry
@@ -257,6 +262,132 @@ function switchSubTab(type) {
     event.target.classList.add('active');
 }
 
+// --- قسم المشتريات ---
+
+function getFormattedDateTime() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const ampm = hours >= 12 ? 'م' : 'ص';
+    hours = hours % 12;
+    hours = hours ? hours : 12; 
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    return `${yyyy}-${mm}-${dd} ${hours}:${minutes} ${ampm}`;
+}
+
+window.app = window.app || {};
+
+window.app.showAddPurchaseForm = () => {
+    document.getElementById('addPurchaseFormContainer').classList.remove('hidden');
+    document.getElementById('purchaseEditId').value = '';
+    document.getElementById('purchaseForm').reset();
+    document.getElementById('purchaseDateTime').value = getFormattedDateTime();
+};
+
+window.app.hideAddPurchaseForm = () => {
+    document.getElementById('addPurchaseFormContainer').classList.add('hidden');
+};
+
+document.getElementById('purchaseForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const editId = document.getElementById('purchaseEditId').value;
+    const dateTime = document.getElementById('purchaseDateTime').value;
+    const notes = document.getElementById('purchaseNotes').value;
+    const price = parseFloat(document.getElementById('purchasePrice').value);
+
+    if (editId) {
+        const index = appState.purchases.findIndex(p => p.id == editId);
+        if (index !== -1) {
+            appState.purchases[index].notes = notes;
+            appState.purchases[index].price = price;
+        }
+    } else {
+        appState.purchases.push({
+            id: Date.now(),
+            dateTime: dateTime,
+            dateOnly: dateTime.split(' ')[0],
+            notes: notes,
+            price: price
+        });
+    }
+    saveData();
+    app.hideAddPurchaseForm();
+    renderPurchasesTable();
+});
+
+window.app.deletePurchase = (id) => {
+    appState.purchases = appState.purchases.filter(p => p.id !== id);
+    saveData();
+    renderPurchasesTable();
+};
+
+window.app.editPurchase = (id) => {
+    const purchase = appState.purchases.find(p => p.id === id);
+    if (purchase) {
+        app.showAddPurchaseForm();
+        document.getElementById('purchaseEditId').value = purchase.id;
+        document.getElementById('purchaseDateTime').value = purchase.dateTime;
+        document.getElementById('purchaseNotes').value = purchase.notes;
+        document.getElementById('purchasePrice').value = purchase.price;
+    }
+};
+
+window.app.clearPurchases = () => {
+    appState.purchases = [];
+    saveData();
+    renderPurchasesTable();
+    document.getElementById('filterPurchaseFrom').value = '';
+    document.getElementById('filterPurchaseTo').value = '';
+};
+
+window.app.filterPurchases = () => {
+    const from = document.getElementById('filterPurchaseFrom').value;
+    const to = document.getElementById('filterPurchaseTo').value;
+    let filtered = appState.purchases || [];
+    if(from && to) {
+        filtered = filtered.filter(p => p.dateOnly >= from && p.dateOnly <= to);
+    }
+    renderPurchasesTable(filtered);
+};
+
+function renderPurchasesTable(filteredList = null) {
+    const tbody = document.getElementById('purchasesTableBody');
+    tbody.innerHTML = '';
+    
+    const listToRender = filteredList || appState.purchases || [];
+    let total = 0;
+    const formatter = new Intl.NumberFormat('ar-IQ');
+
+    if(listToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">لا توجد سجلات مشتريات</td></tr>`;
+        document.getElementById('totalPurchasesValue').innerText = '0 د.ع';
+        return;
+    }
+
+    listToRender.forEach(p => {
+        total += p.price;
+        tbody.innerHTML += `
+            <tr>
+                <td>${p.dateTime}</td>
+                <td>${p.notes}</td>
+                <td class="text-danger">${formatter.format(p.price)} د.ع</td>
+                <td>
+                    <button class="btn-primary" style="padding: 5px 10px; margin-left: 5px; box-shadow: none; display: inline-block;" onclick="app.editPurchase(${p.id})">
+                        تعديل
+                    </button>
+                    <button class="btn-danger" style="padding: 5px 10px; box-shadow: none; display: inline-block;" onclick="app.deletePurchase(${p.id})">
+                        حذف
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    document.getElementById('totalPurchasesValue').innerText = formatter.format(total) + ' د.ع';
+}
+
 // --- 4. Excel Import Layer (SheetJS) ---
 const fileInput = document.getElementById('excelFile');
 const processBtn = document.getElementById('processExcelBtn');
@@ -343,24 +474,22 @@ processBtn.addEventListener('click', () => {
 });
 
 // App Object (Exposed for HTML inline handlers like clear data)
-window.app = {
-    clearData: () => {
-        Swal.fire({
-            title: 'تحذير خطير!',
-            text: "هل أنت متأكد من مسح كافة بيانات النظام؟",
-            icon: 'error',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            confirmButtonText: 'نعم، امسح كل شيء',
-            background: '#1e293b', color: '#fff'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                localStorage.removeItem(STORAGE_KEY);
-                location.reload();
-            }
-        });
-    }
-}
+window.app.clearData = () => {
+    Swal.fire({
+        title: 'تحذير خطير!',
+        text: "هل أنت متأكد من مسح كافة بيانات النظام؟",
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'نعم، امسح كل شيء',
+        background: '#1e293b', color: '#fff'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    });
+};
 
 // Run Initialization
 initApp();
