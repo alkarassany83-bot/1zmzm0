@@ -122,6 +122,10 @@ document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.add('active');
         const targetId = item.getAttribute('data-target');
         document.getElementById(targetId).classList.add('active');
+        
+        if(targetId === 'purchases') {
+            document.getElementById('purchaseDateTime').value = getFormattedDateTime();
+        }
     });
 });
 
@@ -132,6 +136,7 @@ document.getElementById('currentDate').innerText = new Date().toLocaleDateString
 function initApp() {
     loadData();
     document.getElementById('entryDate').valueAsDate = new Date();
+    document.getElementById('purchaseDateTime').value = getFormattedDateTime();
     updateDashboard();
     renderDailyTable();
     renderPurchasesTable();
@@ -263,6 +268,7 @@ function switchSubTab(type) {
 }
 
 // --- قسم المشتريات ---
+let currentPurchaseCategory = 'حصة طبيبه';
 
 function getFormattedDateTime() {
     const now = new Date();
@@ -280,20 +286,27 @@ function getFormattedDateTime() {
 
 window.app = window.app || {};
 
-window.app.showAddPurchaseForm = () => {
-    document.getElementById('addPurchaseFormContainer').classList.remove('hidden');
+window.app.selectPurchaseCategory = (category, btn) => {
+    currentPurchaseCategory = category;
+    document.getElementById('currentPurchaseCategoryLabel').innerText = category;
+    document.getElementById('purchaseCategory').value = category;
+
+    if(btn) {
+        document.querySelectorAll('#purchaseCategories .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
     document.getElementById('purchaseEditId').value = '';
     document.getElementById('purchaseForm').reset();
     document.getElementById('purchaseDateTime').value = getFormattedDateTime();
-};
 
-window.app.hideAddPurchaseForm = () => {
-    document.getElementById('addPurchaseFormContainer').classList.add('hidden');
+    renderPurchasesTable();
 };
 
 document.getElementById('purchaseForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const editId = document.getElementById('purchaseEditId').value;
+    const category = document.getElementById('purchaseCategory').value;
     const dateTime = document.getElementById('purchaseDateTime').value;
     const notes = document.getElementById('purchaseNotes').value;
     const price = parseFloat(document.getElementById('purchasePrice').value);
@@ -307,6 +320,7 @@ document.getElementById('purchaseForm').addEventListener('submit', function(e) {
     } else {
         appState.purchases.push({
             id: Date.now(),
+            category: category,
             dateTime: dateTime,
             dateOnly: dateTime.split(' ')[0],
             notes: notes,
@@ -314,7 +328,11 @@ document.getElementById('purchaseForm').addEventListener('submit', function(e) {
         });
     }
     saveData();
-    app.hideAddPurchaseForm();
+    
+    document.getElementById('purchaseEditId').value = '';
+    this.reset();
+    document.getElementById('purchaseDateTime').value = getFormattedDateTime();
+    
     renderPurchasesTable();
 });
 
@@ -327,7 +345,6 @@ window.app.deletePurchase = (id) => {
 window.app.editPurchase = (id) => {
     const purchase = appState.purchases.find(p => p.id === id);
     if (purchase) {
-        app.showAddPurchaseForm();
         document.getElementById('purchaseEditId').value = purchase.id;
         document.getElementById('purchaseDateTime').value = purchase.dateTime;
         document.getElementById('purchaseNotes').value = purchase.notes;
@@ -335,29 +352,17 @@ window.app.editPurchase = (id) => {
     }
 };
 
-window.app.clearPurchases = () => {
-    appState.purchases = [];
+window.app.clearPurchasesByCategory = () => {
+    appState.purchases = appState.purchases.filter(p => p.category !== currentPurchaseCategory);
     saveData();
     renderPurchasesTable();
-    document.getElementById('filterPurchaseFrom').value = '';
-    document.getElementById('filterPurchaseTo').value = '';
 };
 
-window.app.filterPurchases = () => {
-    const from = document.getElementById('filterPurchaseFrom').value;
-    const to = document.getElementById('filterPurchaseTo').value;
-    let filtered = appState.purchases || [];
-    if(from && to) {
-        filtered = filtered.filter(p => p.dateOnly >= from && p.dateOnly <= to);
-    }
-    renderPurchasesTable(filtered);
-};
-
-function renderPurchasesTable(filteredList = null) {
+function renderPurchasesTable() {
     const tbody = document.getElementById('purchasesTableBody');
     tbody.innerHTML = '';
     
-    const listToRender = filteredList || appState.purchases || [];
+    const listToRender = (appState.purchases || []).filter(p => p.category === currentPurchaseCategory || (!p.category && currentPurchaseCategory === 'اخرى'));
     let total = 0;
     const formatter = new Intl.NumberFormat('ar-IQ');
 
